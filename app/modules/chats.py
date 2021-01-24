@@ -1,0 +1,49 @@
+import quart
+from app.utils import decorators, utils
+from app.utils import data as data_utils
+#from bot.api import tokens as bot_tokens
+#from bot.api import users as bot_users
+#from bot.api import chats as bot_chats
+
+blueprint = quart.Blueprint("chats", __name__)
+
+
+@blueprint.route("/api/chats/users", methods=["POST"])
+@decorators.req_fields({"token": str})
+@decorators.token_verify
+async def users():
+    req_json = await quart.request.json
+    token = req_json["token"]
+    chat_id = await data_utils.get_chat_id_by_token(token)
+    users = await data_utils.get_chat_members(chat_id)
+    user_dict = {user.id: {item[0]: item[1] for item in vars(user).items() if utils.is_jsonable(item[1])}
+                 for user in users}
+    return quart.jsonify(user_dict)
+
+
+@blueprint.route("/api/chats/info", methods=["POST"])
+@decorators.req_fields({"token": str})
+@decorators.token_verify
+async def title():
+    req_json = await quart.request.json
+    token = req_json["token"]
+    chat_id = await data_utils.get_chat_id_by_token(token)
+    chat = await data_utils.get_chat_info(chat_id)
+    return quart.jsonify(chat)
+
+
+@blueprint.route("/api/chats/photo", methods=["POST"])
+@decorators.req_fields({"token": str})
+@decorators.token_verify
+async def photo():
+    req_json = await quart.request.json
+    token = req_json["token"]
+    chat_id = await data_utils.get_chat_id_by_token(token)
+    photo = await data_utils.get_last_photo(chat_id)
+    if photo is None:
+        await quart.abort(404)
+    resp = await quart.make_response(photo)
+    resp.headers.set("Content-Type", "image/jpeg")
+    resp.headers.set("Content-Disposition", "attachment",
+                     filename=f"{chat_id}.jpeg")
+    return resp
